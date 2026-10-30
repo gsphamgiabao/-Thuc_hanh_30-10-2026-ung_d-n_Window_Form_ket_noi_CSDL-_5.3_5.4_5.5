@@ -1,0 +1,117 @@
+﻿SET ANSI_NULLS ON;
+GO
+SET QUOTED_IDENTIFIER ON;
+GO
+
+IF DB_ID(N'CafePOSDB') IS NULL
+BEGIN
+	CREATE DATABASE CafePOSDB;
+END;
+GO
+
+USE CafePOSDB;
+GO
+
+SET ANSI_NULLS ON;
+GO
+SET QUOTED_IDENTIFIER ON;
+GO
+
+IF OBJECT_ID(N'dbo.BanAn', N'U') IS NULL
+BEGIN
+	CREATE TABLE dbo.BanAn
+	(
+		MaBan INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_BanAn PRIMARY KEY,
+		TenBan NVARCHAR(50) NOT NULL,
+		TrangThai NVARCHAR(20) NOT NULL CONSTRAINT DF_BanAn_TrangThai DEFAULT (N'Trống')
+	);
+END;
+GO
+
+IF OBJECT_ID(N'dbo.DanhMuc', N'U') IS NULL
+BEGIN
+	CREATE TABLE dbo.DanhMuc
+	(
+		MaDanhMuc INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_DanhMuc PRIMARY KEY,
+		TenDanhMuc NVARCHAR(100) NOT NULL
+	);
+END;
+GO
+
+IF OBJECT_ID(N'dbo.MonAn', N'U') IS NULL
+BEGIN
+	CREATE TABLE dbo.MonAn
+	(
+		MaMon INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_MonAn PRIMARY KEY,
+		TenMon NVARCHAR(100) NOT NULL,
+		MaDanhMuc INT NOT NULL,
+		DonGia DECIMAL(18,2) NOT NULL,
+		CONSTRAINT FK_MonAn_DanhMuc FOREIGN KEY (MaDanhMuc) REFERENCES dbo.DanhMuc(MaDanhMuc),
+		CONSTRAINT CK_MonAn_DonGia CHECK (DonGia >= 0)
+	);
+END;
+GO
+
+IF OBJECT_ID(N'dbo.HoaDon', N'U') IS NULL
+BEGIN
+	CREATE TABLE dbo.HoaDon
+	(
+		MaHoaDon INT IDENTITY(1,1) NOT NULL CONSTRAINT PK_HoaDon PRIMARY KEY,
+		MaBan INT NOT NULL,
+		GioVao DATETIME NOT NULL CONSTRAINT DF_HoaDon_GioVao DEFAULT (GETDATE()),
+		GioRa DATETIME NULL,
+		TongTien DECIMAL(18,2) NOT NULL CONSTRAINT DF_HoaDon_TongTien DEFAULT (0),
+		TrangThai BIT NOT NULL CONSTRAINT DF_HoaDon_TrangThai DEFAULT (0),
+		CONSTRAINT FK_HoaDon_BanAn FOREIGN KEY (MaBan) REFERENCES dbo.BanAn(MaBan)
+	);
+END;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = N'UX_HoaDon_ActiveTable' AND object_id = OBJECT_ID(N'dbo.HoaDon'))
+BEGIN
+	CREATE UNIQUE INDEX UX_HoaDon_ActiveTable ON dbo.HoaDon (MaBan) WHERE TrangThai = 0;
+END;
+GO
+
+IF OBJECT_ID(N'dbo.ChiTietHoaDon', N'U') IS NULL
+BEGIN
+	CREATE TABLE dbo.ChiTietHoaDon
+	(
+		MaHoaDon INT NOT NULL,
+		MaMon INT NOT NULL,
+		SoLuong INT NOT NULL,
+		DonGia DECIMAL(18,2) NOT NULL,
+		CONSTRAINT PK_ChiTietHoaDon PRIMARY KEY (MaHoaDon, MaMon),
+		CONSTRAINT FK_ChiTietHoaDon_HoaDon FOREIGN KEY (MaHoaDon) REFERENCES dbo.HoaDon(MaHoaDon),
+		CONSTRAINT FK_ChiTietHoaDon_MonAn FOREIGN KEY (MaMon) REFERENCES dbo.MonAn(MaMon),
+		CONSTRAINT CK_ChiTietHoaDon_SoLuong CHECK (SoLuong > 0),
+		CONSTRAINT CK_ChiTietHoaDon_DonGia CHECK (DonGia >= 0)
+	);
+END;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.BanAn)
+BEGIN
+	INSERT INTO dbo.BanAn (TenBan) VALUES
+		(N'Bàn 01'), (N'Bàn 02'), (N'Bàn 03'), (N'Bàn 04'), (N'Bàn 05'),
+		(N'Bàn 06'), (N'Bàn 07'), (N'Bàn 08'), (N'Bàn 09'), (N'Bàn 10');
+END;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.DanhMuc)
+BEGIN
+	INSERT INTO dbo.DanhMuc (TenDanhMuc) VALUES
+		(N'Cà phê'), (N'Trà sữa'), (N'Đồ ăn nhẹ');
+END;
+GO
+
+IF NOT EXISTS (SELECT 1 FROM dbo.MonAn)
+BEGIN
+	INSERT INTO dbo.MonAn (TenMon, MaDanhMuc, DonGia)
+	SELECT N'Cà phê đen', MaDanhMuc, 25000 FROM dbo.DanhMuc WHERE TenDanhMuc = N'Cà phê'
+	UNION ALL SELECT N'Cà phê sữa', MaDanhMuc, 30000 FROM dbo.DanhMuc WHERE TenDanhMuc = N'Cà phê'
+	UNION ALL SELECT N'Trà sữa truyền thống', MaDanhMuc, 35000 FROM dbo.DanhMuc WHERE TenDanhMuc = N'Trà sữa'
+	UNION ALL SELECT N'Trà sữa trân châu', MaDanhMuc, 40000 FROM dbo.DanhMuc WHERE TenDanhMuc = N'Trà sữa'
+	UNION ALL SELECT N'Bánh croissant', MaDanhMuc, 28000 FROM dbo.DanhMuc WHERE TenDanhMuc = N'Đồ ăn nhẹ';
+END;
+GO
